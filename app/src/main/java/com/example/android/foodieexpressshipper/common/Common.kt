@@ -76,11 +76,11 @@ object Common {
             .toString()
     }
 
-    fun updateToken(context: Context, token: String) {
+    fun updateToken(context: Context, token: String,isServerToken : Boolean,isShipperToken: Boolean) {
         FirebaseDatabase.getInstance()
             .getReference(Common.TOKEN_REF)
             .child(Common.currentShipperUser!!.uid!!)
-            .setValue(TokenModel(currentShipperUser!!.phone!!,token))
+            .setValue(TokenModel(Common.currentShipperUser!!.phone!!,token,isServerToken,isShipperToken))
             .addOnFailureListener{e-> Toast.makeText(context,""+e.message, Toast.LENGTH_SHORT).show()}
     }
 
