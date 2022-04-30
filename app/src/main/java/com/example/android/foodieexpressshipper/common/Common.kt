@@ -25,6 +25,7 @@ import java.lang.StringBuilder
 import java.util.*
 
 object Common {
+    val SHIPPING_ORDER_REF: String = "ShippingOrder"
     val ORDER_REF: String = "Order"
     val SHIPPER_REF = "Shippers"
     const val TOKEN_REF = "Tokens"
