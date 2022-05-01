@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.location.Location
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.Looper
@@ -21,6 +22,8 @@ import androidx.core.graphics.drawable.toBitmap
 import com.bumptech.glide.Glide
 import com.example.android.foodieexpressshipper.common.Common
 import com.example.android.foodieexpressshipper.common.Common.SHIPPING_DATA
+import com.example.android.foodieexpressshipper.common.LatLngInterpolator
+import com.example.android.foodieexpressshipper.common.MarkerAnimation
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -58,6 +61,11 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private var shipperMarker: Marker? = null
     private var shippingOrderModel: ShipperOrderModel? = null
+
+
+    var isInit = false
+    var previousLocation:Location? = null
+
 
     val requestPermissionLauncher =
         registerForActivityResult(
@@ -217,11 +225,25 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
                             .position(locationShipper)
                             .title("You")
                     )!!
+                    mMap!!.animateCamera(CameraUpdateFactory.newLatLngZoom(locationShipper, 15f))
                 } else {
                     shipperMarker!!.position = locationShipper
 
                 }
-                mMap!!.animateCamera(CameraUpdateFactory.newLatLngZoom(locationShipper, 15f))
+                if(isInit && previousLocation != null) {
+                    val previousLocationLatLng = LatLng(previousLocation!!.latitude,previousLocation!!.longitude)
+                    MarkerAnimation.animateMarkerToGB(shipperMarker!!,locationShipper,LatLngInterpolator.Spherical())
+                    shipperMarker!!.rotation = Common.getBearing(previousLocationLatLng,locationShipper)
+                    mMap!!.animateCamera(CameraUpdateFactory.newLatLng(locationShipper))
+                    previousLocation = p0.lastLocation
+
+                }
+
+                if (!isInit) {
+                    isInit = true
+                    previousLocation = p0.lastLocation
+                }
+
             }
         }
     }
