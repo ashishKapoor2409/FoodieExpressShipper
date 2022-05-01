@@ -1,6 +1,7 @@
 package com.example.android.foodieexpressshipper.Adapter
 
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
@@ -10,9 +11,12 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.example.android.foodieexpressshipper.R
+import com.example.android.foodieexpressshipper.ShippingActivity
 import com.example.android.foodieexpressshipper.common.Common
 import com.example.android.foodieexpressshipper.model.ShipperOrderModel
 import com.google.android.material.button.MaterialButton
+import com.google.gson.Gson
+import io.paperdb.Paper
 import java.text.SimpleDateFormat
 
 
@@ -23,6 +27,7 @@ var shippingOrderModelList: List<ShipperOrderModel>) : RecyclerView.Adapter<MySh
 
     init {
             simpleDateFormat = SimpleDateFormat("dd-MM-yyyy HH:mm:ss")
+        Paper.init(context)
     }
 
     inner class MyViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -66,6 +71,13 @@ var shippingOrderModelList: List<ShipperOrderModel>) : RecyclerView.Adapter<MySh
         if(shippingOrderModelList[position].isStartTrip) {
             holder.btn_ship_now.isEnabled = false
         }
+
+        //Event
+
+            holder.btn_ship_now.setOnClickListener{
+                Paper.book().write(Common.SHIPPING_DATA,Gson().toJson(shippingOrderModelList[0]))
+                context.startActivity(Intent(context,ShippingActivity::class.java))
+            }
 
     }
 
