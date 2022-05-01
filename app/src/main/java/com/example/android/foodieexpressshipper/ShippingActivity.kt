@@ -16,6 +16,7 @@ import android.text.TextUtils
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.animation.LinearInterpolator
+import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
@@ -38,8 +39,14 @@ import com.example.android.foodieexpressshipper.databinding.ActivityShippingBind
 import com.example.android.foodieexpressshipper.model.ShipperOrderModel
 import com.example.android.foodieexpressshipper.remote.IGoogleApi
 import com.example.android.foodieexpressshipper.remote.RetroFitClient
+import com.google.android.gms.common.api.Status
 import com.google.android.gms.location.*
 import com.google.android.gms.maps.model.*
+import com.google.android.libraries.places.api.Places
+import com.google.android.libraries.places.api.model.Place
+import com.google.android.libraries.places.api.net.PlacesClient
+import com.google.android.libraries.places.widget.AutocompleteSupportFragment
+import com.google.android.libraries.places.widget.listener.PlaceSelectionListener
 import com.google.gson.Gson
 import com.karumi.dexter.Dexter
 import com.karumi.dexter.PermissionToken
@@ -54,6 +61,8 @@ import com.google.gson.reflect.TypeToken
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.schedulers.Schedulers
 import org.json.JSONObject
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
@@ -68,6 +77,7 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var txt_order_number: TextView
     private lateinit var txt_date: TextView
     private lateinit var img_food_image: ImageView
+    private lateinit var btn_start_trip: Button
 
     private var shipperMarker: Marker? = null
     private var shippingOrderModel: ShipperOrderModel? = null
@@ -94,6 +104,15 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
     private var iGoogleApi:IGoogleApi? = null
     private var compositeDisposable = CompositeDisposable()
 
+    private lateinit var places_fragment:AutocompleteSupportFragment
+    private lateinit var placesClient:PlacesClient
+    private val placeFields = Arrays.asList(
+        Place.Field.ID,
+        Place.Field.NAME,
+        Place.Field.ADDRESS,
+        Place.Field.LAT_LNG
+    )
+
 
 
     val requestPermissionLauncher =
@@ -116,18 +135,21 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         //setContentView(R.layout.activity_shipping)
-        val itemView = LayoutInflater.from(this).inflate(R.layout.activity_shipping, null)
-        setContentView(itemView)
+        setContentView(R.layout.activity_shipping)
+
 
         iGoogleApi = RetroFitClient.instance!!.create(IGoogleApi::class.java)
-        txt_name = itemView.findViewById(R.id.txt_name)
-        txt_address = itemView.findViewById(R.id.txt_address)
-        txt_order_number = itemView.findViewById(R.id.txt_order_number)
-        txt_date = itemView.findViewById(R.id.txt_date)
-        img_food_image = itemView.findViewById(R.id.img_food_image)
+        txt_name = findViewById(R.id.txt_name)
+        txt_address = findViewById(R.id.txt_address)
+        txt_order_number = findViewById(R.id.txt_order_number)
+        txt_date = findViewById(R.id.txt_date)
+        img_food_image = findViewById(R.id.img_food_image)
+        btn_start_trip = findViewById(R.id.btn_start_trip)
 //        binding = ActivityShippingBinding.inflate(layoutInflater)
 //        setContentView(binding.root)
 
+        initPlaces()
+        setupPlaceAutocomplete()
         buildLocationRequest()
         buildLocationCallback()
         setShippingOrderModel()
@@ -185,12 +207,53 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
 
             }).check()
 
+        initViews()
 
+
+    }
+
+    private fun setupPlaceAutocomplete() {
+        places_fragment = supportFragmentManager.findFragmentById(R.id.places_autocomplete_fragment)
+        as AutocompleteSupportFragment
+        places_fragment.setPlaceFields(placeFields)
+        places_fragment.setOnPlaceSelectedListener(object :PlaceSelectionListener{
+            override fun onError(p0: Status) {
+                Toast.makeText(this@ShippingActivity,""+p0.statusMessage, Toast.LENGTH_SHORT).show()
+            }
+
+            override fun onPlaceSelected(p0: Place) {
+                Toast.makeText(this@ShippingActivity,StringBuilder(p0.name!!)
+                    .append("-")
+                    .append(p0.latLng).toString(), Toast.LENGTH_SHORT).show()
+            }
+
+        })
+    }
+
+    private fun initPlaces() {
+        Places.initialize(this,getString(R.string.google_maps_key))
+        placesClient  = Places.createClient(this)
+    }
+
+    private fun initViews() {
+        btn_start_trip.setOnClickListener {
+            val data = Paper.book().read<String>(Common.SHIPPING_DATA)
+            Paper.book().write(Common.TRIP_START,data)
+            btn_start_trip.isEnabled = false
+        }
     }
 
     private fun setShippingOrderModel() {
         Paper.init(this)
-        val data = Paper.book().read<String>(Common.SHIPPING_DATA)
+        var data :String? = null
+        if(TextUtils.isEmpty(Paper.book().read(Common.TRIP_START))) {
+            data = Paper.book().read<String>(Common.SHIPPING_DATA)
+            btn_start_trip.isEnabled = true
+        }
+        else {
+            data = Paper.book().read<String>(Common.SHIPPING_DATA)
+            btn_start_trip.isEnabled = true
+        }
         if (!TextUtils.isEmpty(data)) {
 
             shippingOrderModel = Gson()
