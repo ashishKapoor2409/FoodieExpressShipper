@@ -99,6 +99,8 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
     private var greyPolyline:Polyline? = null
     private var polylineOptions:PolylineOptions? = null
     private var blackPolylineOptions:PolylineOptions? = null
+    private var redPolyline:Polyline? = null
+
 
     private var polylineList:List<LatLng> = ArrayList<LatLng>()
     private var iGoogleApi:IGoogleApi? = null
@@ -152,7 +154,6 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
         setupPlaceAutocomplete()
         buildLocationRequest()
         buildLocationCallback()
-        setShippingOrderModel()
 
         Dexter.withActivity(this)
             .withPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
@@ -255,7 +256,7 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
             btn_start_trip.isEnabled = true
         }
         if (!TextUtils.isEmpty(data)) {
-
+            drawRoutes(data)
             shippingOrderModel = Gson()
                 .fromJson<ShipperOrderModel>(data, object : TypeToken<ShipperOrderModel>() {}.type)
 
@@ -294,6 +295,83 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
         } else {
             Toast.makeText(this, "Shipping Order Model is null", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun drawRoutes(data: String?) {
+        val shippingOrderModel = Gson()
+            .fromJson<ShipperOrderModel>(data,object:TypeToken<ShipperOrderModel>(){}.type)
+
+        mMap.addMarker(MarkerOptions()
+            .icon(BitmapDescriptorFactory.fromResource(R.drawable.box))
+            .title(shippingOrderModel.orderModel!!.userName)
+            .snippet(shippingOrderModel.orderModel!!.shippingAddress)
+            .position(LatLng(shippingOrderModel.orderModel!!.lat,shippingOrderModel.orderModel!!.lng)))
+
+        if (ContextCompat.checkSelfPermission(
+                this@ShippingActivity,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED &&
+
+            ContextCompat.checkSelfPermission(
+                this@ShippingActivity,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationProviderClient.lastLocation
+                .addOnFailureListener { e -> Toast.makeText(this@ShippingActivity,""+e.message,
+                    Toast.LENGTH_SHORT).show() }
+                .addOnSuccessListener { location ->
+                    val to = StringBuilder().append(shippingOrderModel.orderModel!!.lat)
+                        .append(",")
+                        .append(shippingOrderModel.orderModel!!.lng).toString()
+                    val from = StringBuilder().append(location.latitude)
+                        .append(",")
+                        .append(location.longitude)
+                        .toString()
+
+                    compositeDisposable.add(iGoogleApi!!.getDirections("driving","less_driving",
+                        from,to,getString(R.string.google_maps_key))!!
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe({ s ->
+                            try {
+
+                                val jsonObject = JSONObject(s)
+                                val jsonArray = jsonObject.getJSONArray("routes")
+                                for (i in 0 until jsonArray.length()) {
+                                    val route = jsonArray.getJSONObject(i)
+                                    val poly = route.getJSONObject("overview_polyline")
+                                    val polyline = poly.getString("points")
+                                    polylineList = Common.decodePoly(polyline)
+
+                                }
+                                polylineOptions = PolylineOptions()
+                                polylineOptions!!.color(Color.RED)
+                                polylineOptions!!.width(12.0f)
+                                polylineOptions!!.startCap(SquareCap())
+                                polylineOptions!!.endCap(SquareCap())
+                                polylineOptions!!.jointType(JointType.ROUND)
+                                polylineOptions!!.addAll(polylineList)
+                                redPolyline = mMap.addPolyline(polylineOptions!!)
+
+
+                            } catch (e: Exception) {
+                                Log.d("DEBUG", e.message.toString())
+                            }
+                        }, { throwable ->
+                            Toast.makeText(this@ShippingActivity,""+throwable.message,Toast.LENGTH_SHORT).show()
+                        }
+                        ))
+                }
+        } else {
+
+            // You can directly ask for the permission.
+            // The registered ActivityResultCallback gets the result of this request.
+            requestPermissionLauncher.launch(
+                Manifest.permission.ACCESS_FINE_LOCATION
+            )
+        }
+
     }
 
     private fun buildLocationCallback() {
@@ -476,7 +554,7 @@ class ShippingActivity : AppCompatActivity(), OnMapReadyCallback {
      */
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
-
+        setShippingOrderModel()
         mMap!!.uiSettings.isZoomControlsEnabled = true
         try {
             val success = googleMap.setMapStyle(
